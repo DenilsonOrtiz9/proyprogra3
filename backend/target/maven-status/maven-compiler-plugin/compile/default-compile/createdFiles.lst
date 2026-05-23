@@ -1,0 +1,14 @@
+com\tecniservice\gestionservicio\GestionServicioApplication.class
+com\tecniservice\gestionservicio\service\ServiceOrderService.class
+com\tecniservice\gestionservicio\model\User.class
+com\tecniservice\gestionservicio\repository\ServiceOrderRepository.class
+com\tecniservice\gestionservicio\model\ServiceOrder.class
+com\tecniservice\gestionservicio\repository\UserRepository.class
+com\tecniservice\gestionservicio\model\ServiceStatus.class
+com\tecniservice\gestionservicio\controller\UserController.class
+com\tecniservice\gestionservicio\model\Evidence.class
+com\tecniservice\gestionservicio\controller\ServiceOrderController.class
+com\tecniservice\gestionservicio\config\DataInitializer.class
+com\tecniservice\gestionservicio\repository\EvidenceRepository.class
+com\tecniservice\gestionservicio\controller\AuthController.class
+com\tecniservice\gestionservicio\config\WebConfig.class
