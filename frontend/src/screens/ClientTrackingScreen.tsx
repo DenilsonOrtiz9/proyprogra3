@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { getOrderById } from '../services/api';
 import { ServiceOrder, formatStatus } from '../types';
 import { useTheme } from '../services/ThemeContext';
+import ImageModal from '../components/ImageModal';
 
 const ClientTrackingScreen = () => {
     const [orderId, setOrderId] = useState('');
     const [order, setOrder] = useState<ServiceOrder | null>(null);
     const [loading, setLoading] = useState(false);
+    const [selectedStatusStep, setSelectedStatusStep] = useState<number | null>(null);
     const { colors, isDark } = useTheme();
+
+    // State for Image Modal
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [modalVisible, setModalVisible] = useState(false);
+
+    const STATUS_KEYS = ['RECIBIDO', 'EN_DIAGNOSTICO', 'EN_REPARACION', 'LISTO_ENTREGA', 'ENTREGADO'];
 
     const handleSearch = async () => {
         if (!orderId) {
@@ -18,9 +26,12 @@ const ClientTrackingScreen = () => {
 
         setLoading(true);
         setOrder(null);
+        setSelectedStatusStep(null);
         try {
             const data = await getOrderById(parseInt(orderId));
             setOrder(data);
+            // Por defecto mostrar el estado actual al buscar
+            setSelectedStatusStep(getStatusStep(data.estadoActual));
         } catch (error) {
             Alert.alert('No encontrado', 'No se encontró una orden con ese ID');
         } finally {
@@ -29,12 +40,27 @@ const ClientTrackingScreen = () => {
     };
 
     const getStatusStep = (status: string) => {
-        const steps = ['RECIBIDO', 'EN_DIAGNOSTICO', 'EN_REPARACION', 'LISTO_ENTREGA', 'ENTREGADO'];
-        return steps.indexOf(status);
+        return STATUS_KEYS.indexOf(status);
+    };
+
+    const filteredEvidencias = order?.evidencias.filter(ev => {
+        // Tratar null o undefined como 'RECIBIDO' para compatibilidad con órdenes viejas
+        const evEstado = ev.estado || 'RECIBIDO';
+        if (selectedStatusStep === null) return true; 
+        return evEstado === STATUS_KEYS[selectedStatusStep];
+    }) || [];
+
+    const openImage = (uri: string) => {
+        setSelectedImage(uri);
+        setModalVisible(true);
     };
 
     return (
-        <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
             <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.text }]}>Seguimiento</Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Consulte el estado de su equipo</Text>
@@ -73,15 +99,38 @@ const ClientTrackingScreen = () => {
                             
                             <View style={[styles.timelineContainer, { borderTopColor: colors.border }]}>
                                 {['Recibido', 'Diagnóstico', 'Reparación', 'Listo', 'Entregado'].map((step, index) => {
-                                    const active = index <= getStatusStep(order.estadoActual);
+                                    const isReached = index <= getStatusStep(order.estadoActual);
+                                    const isSelected = index === selectedStatusStep;
+                                    
                                     return (
-                                        <View key={step} style={styles.timelineItem}>
-                                            <View style={[styles.dot, active && { backgroundColor: colors.primary }, !active && { backgroundColor: colors.border }]} />
-                                            <Text style={[styles.stepText, { color: active ? colors.text : colors.textSecondary }]}>{step}</Text>
-                                        </View>
+                                        <TouchableOpacity 
+                                            key={step} 
+                                            style={styles.timelineItem}
+                                            onPress={() => isReached && setSelectedStatusStep(isSelected ? null : index)}
+                                            disabled={!isReached}
+                                        >
+                                            <View style={[
+                                                styles.dot, 
+                                                isReached && { backgroundColor: colors.primary }, 
+                                                !isReached && { backgroundColor: colors.border },
+                                                isSelected && { transform: [{ scale: 1.5 }], borderWidth: 2, borderColor: '#FFFFFF' }
+                                            ]} />
+                                            <Text style={[
+                                                styles.stepText, 
+                                                { color: isReached ? colors.text : colors.textSecondary },
+                                                isSelected && { fontWeight: '800', color: colors.primary }
+                                            ]}>
+                                                {step}
+                                            </Text>
+                                        </TouchableOpacity>
                                     );
                                 })}
                             </View>
+                            <TouchableOpacity onPress={() => setSelectedStatusStep(null)} style={{ marginTop: 12 }}>
+                                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
+                                    {selectedStatusStep !== null ? 'Ver todas las evidencias' : ''}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
 
                         <View style={[styles.infoGroup, { backgroundColor: colors.card }]}>
@@ -89,31 +138,53 @@ const ClientTrackingScreen = () => {
                                 <Text style={[styles.label, { color: colors.textSecondary }]}>Dispositivo</Text>
                                 <Text style={[styles.value, { color: colors.text }]}>{order.dispositivo}</Text>
                             </View>
-                            <View style={[styles.separator, { backgroundColor: colors.border }]} />
-                            <View style={styles.infoRow}>
-                                <Text style={[styles.label, { color: colors.textSecondary }]}>Reporte de falla</Text>
-                                <Text style={[styles.value, { color: colors.text }]}>{order.descripcionProblema}</Text>
-                            </View>
                         </View>
 
-                        {order.evidencias.length > 0 && (
-                            <View style={styles.evidenceSection}>
-                                <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>Evidencia Inicial</Text>
+                        <View style={styles.evidenceSection}>
+                            <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>
+                                {selectedStatusStep !== null 
+                                    ? `Evidencias: ${formatStatus(STATUS_KEYS[selectedStatusStep])}` 
+                                    : 'Evidencias del Proceso'}
+                            </Text>
+                            {filteredEvidencias.length > 0 ? (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceContent}>
-                                    {order.evidencias.map((ev) => (
-                                        <Image 
-                                            key={ev.id}
-                                            source={{ uri: `http://192.168.1.11:8080/uploads/${ev.rutaImagen}` }}
-                                            style={[styles.evidenceThumb, { backgroundColor: colors.background }]}
-                                        />
+                                    {filteredEvidencias.map((ev) => (
+                                        <TouchableOpacity 
+                                            key={ev.id} 
+                                            style={styles.evidenceItem}
+                                            onPress={() => openImage(`http://192.168.1.6:8080/uploads/${ev.rutaImagen}`)}
+                                        >
+                                            <Image 
+                                                source={{ uri: `http://192.168.1.6:8080/uploads/${ev.rutaImagen}` }}
+                                                style={[styles.evidenceThumb, { backgroundColor: colors.background }]}
+                                            />
+                                            {selectedStatusStep === null && (
+                                                <View style={[styles.statusTag, { backgroundColor: colors.primary }]}>
+                                                    <Text style={styles.statusTagText}>{formatStatus(ev.estado || 'RECIBIDO')}</Text>
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
                                     ))}
                                 </ScrollView>
-                            </View>
-                        )}
+                            ) : (
+                                <View style={[styles.noEvidenceStep, { backgroundColor: colors.card }]}>
+                                    <Text style={[styles.noEvidenceText, { color: colors.textSecondary }]}>
+                                        No hay fotos registradas para este estado.
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
                 )}
             </View>
+
+            <ImageModal 
+                visible={modalVisible}
+                imageUrl={selectedImage}
+                onClose={() => setModalVisible(false)}
+            />
         </ScrollView>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -247,7 +318,37 @@ const styles = StyleSheet.create({
         width: 140,
         height: 140,
         borderRadius: 20,
+    },
+    evidenceItem: {
         marginRight: 12,
+        position: 'relative',
+    },
+    noEvidenceStep: {
+        padding: 32,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+    },
+    noEvidenceText: {
+        fontSize: 14,
+        fontStyle: 'italic',
+        textAlign: 'center',
+    },
+    statusTag: {
+        position: 'absolute',
+        bottom: 8,
+        left: 8,
+        right: 8,
+        paddingVertical: 2,
+        paddingHorizontal: 4,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    statusTagText: {
+        color: '#FFFFFF',
+        fontSize: 8,
+        fontWeight: '700',
     },
 });
 

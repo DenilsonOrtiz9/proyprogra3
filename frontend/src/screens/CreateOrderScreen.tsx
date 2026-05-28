@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { createOrder, uploadEvidence } from '../services/api';
 import { useNavigation } from '@react-navigation/native';
@@ -23,7 +23,7 @@ const CreateOrderScreen = () => {
         }
 
         const result = await ImagePicker.launchCameraAsync({
-            quality: 0.7,
+            quality: 0.5,
             allowsEditing: false,
         });
 
@@ -38,6 +38,11 @@ const CreateOrderScreen = () => {
             return;
         }
 
+        if (!imageUri) {
+            Alert.alert('Evidencia requerida', 'Debe capturar al menos una fotografía como evidencia inicial para crear la orden.');
+            return;
+        }
+
         setLoading(true);
         try {
             const newOrder = await createOrder({
@@ -46,9 +51,7 @@ const CreateOrderScreen = () => {
                 descripcionProblema
             });
 
-            if (imageUri) {
-                await uploadEvidence(newOrder.id, imageUri);
-            }
+            await uploadEvidence(newOrder.id, imageUri);
 
             Alert.alert('Éxito', 'Orden creada correctamente', [
                 { text: 'OK', onPress: () => navigation.goBack() }
@@ -62,7 +65,11 @@ const CreateOrderScreen = () => {
     };
 
     return (
-        <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
             <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.text }]}>Nueva Orden</Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Complete los datos del equipo</Text>
@@ -131,9 +138,9 @@ const CreateOrderScreen = () => {
                 </TouchableOpacity>
             </View>
         </ScrollView>
-    );
-};
-
+        </KeyboardAvoidingView>
+        );
+        };
 const styles = StyleSheet.create({
     container: {
         flex: 1,

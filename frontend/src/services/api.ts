@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { ServiceOrder, ServiceStatus, AuthResponse } from '../types';
 
-const BASE_URL = 'http://192.168.1.11:8080/api'; // Cambiar por la IP local de tu máquina
+const BASE_URL = 'http://192.168.1.6:8080/api'; // Cambiar por la IP local de tu máquina
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -22,8 +22,21 @@ export const createOrder = async (order: Partial<ServiceOrder>) => {
     return response.data;
 };
 
-export const updateOrderStatus = async (id: number, status: ServiceStatus) => {
-    const response = await api.patch<ServiceOrder>(`/orders/${id}/status?status=${status}`);
+export const updateOrderStatus = async (id: number, status: ServiceStatus, imageUri: string) => {
+    const formData = new FormData();
+    
+    // @ts-ignore
+    formData.append('file', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: `status_change_${Date.now()}.jpg`,
+    });
+
+    const response = await api.patch<ServiceOrder>(`/orders/${id}/status?status=${status}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
     return response.data;
 };
 

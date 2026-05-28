@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
-import { getOrderById, updateOrderStatus } from '../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import { getOrderById, updateOrderStatus, uploadEvidence } from '../services/api';
 import { ServiceOrder, ServiceStatus, formatStatus } from '../types';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { useTheme } from '../services/ThemeContext';
+import ImageModal from '../components/ImageModal';
 
 type RootStackParamList = {
     OrderDetail: { orderId: number };
 };
+
+const STATUS_ORDER = [
+    ServiceStatus.RECIBIDO,
+    ServiceStatus.EN_DIAGNOSTICO,
+    ServiceStatus.EN_REPARACION,
+    ServiceStatus.LISTO_ENTREGA,
+    ServiceStatus.ENTREGADO
+];
 
 type OrderDetailRouteProp = RouteProp<RootStackParamList, 'OrderDetail'>;
 
@@ -19,6 +29,11 @@ const OrderDetailScreen = () => {
 
     const [order, setOrder] = useState<ServiceOrder | null>(null);
     const [loading, setLoading] = useState(true);
+    const [updating, setUpdating] = useState(false);
+    
+    // State for Image Modal
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     const fetchOrder = async () => {
         try {
@@ -37,13 +52,77 @@ const OrderDetailScreen = () => {
     }, [orderId]);
 
     const handleUpdateStatus = async (newStatus: ServiceStatus) => {
-        try {
-            await updateOrderStatus(orderId, newStatus);
-            fetchOrder();
-            Alert.alert('Éxito', 'Estado actualizado');
-        } catch (error) {
-            Alert.alert('Error', 'No se pudo actualizar el estado');
+        const currentIndex = STATUS_ORDER.indexOf(order!.estadoActual);
+        const newIndex = STATUS_ORDER.indexOf(newStatus);
+
+        if (newIndex <= currentIndex) {
+            Alert.alert('Acción no permitida', 'No se puede regresar a un estado anterior o igual al actual.');
+            return;
         }
+
+        // Solicitar foto
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara para documentar el cambio de estado');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            quality: 0.6,
+            allowsEditing: false,
+        });
+
+        if (result.canceled) return;
+
+        setUpdating(true);
+        try {
+            await updateOrderStatus(orderId, newStatus, result.assets[0].uri);
+            await fetchOrder();
+            Alert.alert('Éxito', 'Estado actualizado con evidencia fotográfica');
+        } catch (error: any) {
+            const errorMsg = error.response?.data || 'No se pudo actualizar el estado';
+            Alert.alert('Error', errorMsg);
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const handleAddEvidence = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            quality: 0.6,
+            allowsEditing: false,
+        });
+
+        if (result.canceled) return;
+
+        setUpdating(true);
+        try {
+            await uploadEvidence(orderId, result.assets[0].uri);
+            await fetchOrder();
+            Alert.alert('Éxito', 'Evidencia agregada correctamente');
+        } catch (error: any) {
+            Alert.alert('Error', 'No se pudo subir la evidencia');
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const isStatusDisabled = (status: ServiceStatus) => {
+        if (!order) return true;
+        const currentIndex = STATUS_ORDER.indexOf(order.estadoActual);
+        const buttonIndex = STATUS_ORDER.indexOf(status);
+        return buttonIndex <= currentIndex;
+    };
+
+    const openImage = (uri: string) => {
+        setSelectedImage(uri);
+        setModalVisible(true);
     };
 
     if (loading) {
@@ -81,19 +160,38 @@ const OrderDetailScreen = () => {
                 </View>
             </View>
 
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Evidencias</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Evidencias por estado</Text>
             <View style={styles.evidenceGroup}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceContent}>
                     {order.evidencias.map((ev) => (
-                        <Image 
+                        <TouchableOpacity 
                             key={ev.id} 
-                            source={{ uri: `http://192.168.1.11:8080/uploads/${ev.rutaImagen}` }} 
-                            style={[styles.evidenceImage, { backgroundColor: colors.card }]} 
-                        />
+                            style={styles.evidenceItem}
+                            onPress={() => openImage(`http://192.168.1.6:8080/uploads/${ev.rutaImagen}`)}
+                        >
+                            <Image 
+                                source={{ uri: `http://192.168.1.6:8080/uploads/${ev.rutaImagen}` }} 
+                                style={[styles.evidenceImage, { backgroundColor: colors.card }]} 
+                            />
+                            {ev.estado && (
+                                <View style={[styles.statusTag, { backgroundColor: colors.primary }]}>
+                                    <Text style={styles.statusTagText}>{formatStatus(ev.estado)}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
                     ))}
                     {order.evidencias.length === 0 && (
-                        <View style={[styles.emptyEvidence, { backgroundColor: colors.surface }]}>
-                            <Text style={[styles.noEvText, { color: colors.textSecondary }]}>Sin evidencias registradas</Text>
+                        <View style={styles.emptyEvidenceContainer}>
+                            <View style={[styles.emptyEvidence, { backgroundColor: colors.surface }]}>
+                                <Text style={[styles.noEvText, { color: colors.textSecondary }]}>Sin evidencias registradas</Text>
+                            </View>
+                            <TouchableOpacity 
+                                style={[styles.addEvidenceButton, { backgroundColor: colors.primary }]}
+                                onPress={handleAddEvidence}
+                            >
+                                <Text style={styles.addEvidenceIcon}>📷</Text>
+                                <Text style={styles.addEvidenceText}>Agregar Evidencia</Text>
+                            </TouchableOpacity>
                         </View>
                     )}
                 </ScrollView>
@@ -101,26 +199,44 @@ const OrderDetailScreen = () => {
 
             <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Actualizar Estado</Text>
             <View style={[styles.statusGroup, { backgroundColor: colors.surface }]}>
-                {Object.values(ServiceStatus).map((status) => (
-                    <TouchableOpacity
-                        key={status}
-                        style={[
-                            styles.statusButton,
-                            { backgroundColor: colors.card, borderColor: colors.border },
-                            order.estadoActual === status && { backgroundColor: colors.primary, borderColor: colors.primary }
-                        ]}
-                        onPress={() => handleUpdateStatus(status)}
-                    >
-                        <Text style={[
-                            styles.statusButtonText,
-                            { color: colors.textSecondary },
-                            order.estadoActual === status && { color: '#FFFFFF' }
-                        ]}>
-                            {formatStatus(status)}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                {updating ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={{ padding: 20, width: '100%' }} />
+                ) : (
+                    STATUS_ORDER.map((status) => {
+                        const disabled = isStatusDisabled(status);
+                        const isCurrent = order.estadoActual === status;
+                        
+                        return (
+                            <TouchableOpacity
+                                key={status}
+                                style={[
+                                    styles.statusButton,
+                                    { backgroundColor: colors.card, borderColor: colors.border },
+                                    isCurrent && { backgroundColor: colors.primary, borderColor: colors.primary },
+                                    disabled && !isCurrent && { opacity: 0.3 }
+                                ]}
+                                onPress={() => handleUpdateStatus(status)}
+                                disabled={disabled || updating}
+                            >
+                                <Text style={[
+                                    styles.statusButtonText,
+                                    { color: colors.textSecondary },
+                                    isCurrent && { color: '#FFFFFF' },
+                                    disabled && !isCurrent && { color: colors.textSecondary }
+                                ]}>
+                                    {formatStatus(status)}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })
+                )}
             </View>
+
+            <ImageModal 
+                visible={modalVisible}
+                imageUrl={selectedImage}
+                onClose={() => setModalVisible(false)}
+            />
         </ScrollView>
     );
 };
@@ -192,11 +308,29 @@ const styles = StyleSheet.create({
     evidenceContent: {
         paddingHorizontal: 24,
     },
+    evidenceItem: {
+        marginRight: 12,
+        position: 'relative',
+    },
     evidenceImage: {
         width: 200,
-        height: 200,
+        height: 250,
         borderRadius: 20,
-        marginRight: 12,
+    },
+    statusTag: {
+        position: 'absolute',
+        bottom: 12,
+        left: 12,
+        right: 12,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    statusTagText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
     },
     emptyEvidence: {
         width: '100%',
@@ -207,6 +341,34 @@ const styles = StyleSheet.create({
     },
     noEvText: {
         fontStyle: 'italic',
+    },
+    emptyEvidenceContainer: {
+        alignItems: 'center',
+        width: 300,
+        marginRight: 24,
+    },
+    addEvidenceButton: {
+        flexDirection: 'row',
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: -20,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+    },
+    addEvidenceIcon: {
+        fontSize: 18,
+        marginRight: 8,
+    },
+    addEvidenceText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+        fontSize: 14,
     },
     statusGroup: {
         marginHorizontal: 24,

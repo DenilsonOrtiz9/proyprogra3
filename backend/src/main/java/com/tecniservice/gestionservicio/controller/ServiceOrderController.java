@@ -40,11 +40,16 @@ public class ServiceOrderController {
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<ServiceOrder> updateStatus(@PathVariable Long id, @RequestParam ServiceStatus status) {
+    public ResponseEntity<?> updateStatus(
+            @PathVariable Long id, 
+            @RequestParam ServiceStatus status,
+            @RequestParam("file") MultipartFile file) {
         try {
-            return ResponseEntity.ok(service.updateStatus(id, status));
+            return ResponseEntity.ok(service.updateStatus(id, status, file));
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().body("Error al guardar la imagen");
         } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 

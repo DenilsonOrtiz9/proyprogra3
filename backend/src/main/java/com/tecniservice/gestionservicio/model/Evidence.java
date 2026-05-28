@@ -15,6 +15,9 @@ public class Evidence {
     private String rutaImagen;
     private LocalDateTime fechaCaptura;
 
+    @Enumerated(EnumType.STRING)
+    private ServiceStatus estado;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_order_id")
     @JsonIgnore
@@ -22,10 +25,11 @@ public class Evidence {
 
     public Evidence() {}
 
-    public Evidence(Long id, String rutaImagen, LocalDateTime fechaCaptura, ServiceOrder serviceOrder) {
+    public Evidence(Long id, String rutaImagen, LocalDateTime fechaCaptura, ServiceStatus estado, ServiceOrder serviceOrder) {
         this.id = id;
         this.rutaImagen = rutaImagen;
         this.fechaCaptura = fechaCaptura;
+        this.estado = estado;
         this.serviceOrder = serviceOrder;
     }
 
@@ -43,6 +47,9 @@ public class Evidence {
 
     public LocalDateTime getFechaCaptura() { return fechaCaptura; }
     public void setFechaCaptura(LocalDateTime fechaCaptura) { this.fechaCaptura = fechaCaptura; }
+
+    public ServiceStatus getEstado() { return estado; }
+    public void setEstado(ServiceStatus estado) { this.estado = estado; }
 
     public ServiceOrder getServiceOrder() { return serviceOrder; }
     public void setServiceOrder(ServiceOrder serviceOrder) { this.serviceOrder = serviceOrder; }

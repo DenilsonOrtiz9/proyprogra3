@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { login } from '../services/api';
@@ -45,57 +45,64 @@ const LoginScreen = () => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>Acceso Técnico</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Inicie sesión para continuar</Text>
-            </View>
-
-            <View style={[styles.content, { backgroundColor: colors.surface }]}>
-                <View style={styles.formCard}>
-                    <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
-                        <TextInput
-                            style={[styles.input, { color: colors.text }]}
-                            placeholder="Usuario"
-                            placeholderTextColor={colors.textSecondary}
-                            value={username}
-                            onChangeText={setUsername}
-                            autoCapitalize="none"
-                        />
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} keyboardShouldPersistTaps="handled">
+                <View style={[styles.container, { backgroundColor: colors.background }]}>
+                    <View style={styles.header}>
+                        <Text style={[styles.title, { color: colors.text }]}>Acceso Técnico</Text>
+                        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Inicie sesión para continuar</Text>
                     </View>
 
-                    <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
-                        <TextInput
-                            style={[styles.input, { color: colors.text }]}
-                            placeholder="Contraseña"
-                            placeholderTextColor={colors.textSecondary}
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                        />
+                    <View style={[styles.content, { backgroundColor: colors.surface }]}>
+                        <View style={styles.formCard}>
+                            <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    placeholder="Usuario"
+                                    placeholderTextColor={colors.textSecondary}
+                                    value={username}
+                                    onChangeText={setUsername}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    placeholder="Contraseña"
+                                    placeholderTextColor={colors.textSecondary}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                />
+                            </View>
+
+                            <TouchableOpacity 
+                                style={[styles.button, { backgroundColor: colors.primary }]} 
+                                onPress={handleLogin}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.buttonText}>Iniciar Sesión</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={styles.backButton} 
+                                onPress={() => navigation.goBack()}
+                            >
+                                <Text style={[styles.backButtonText, { color: colors.textSecondary }]}>Volver al inicio</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-
-                    <TouchableOpacity 
-                        style={[styles.button, { backgroundColor: colors.primary }]} 
-                        onPress={handleLogin}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.buttonText}>Iniciar Sesión</Text>
-                        )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                        style={styles.backButton} 
-                        onPress={() => navigation.goBack()}
-                    >
-                        <Text style={[styles.backButtonText, { color: colors.textSecondary }]}>Volver al inicio</Text>
-                    </TouchableOpacity>
                 </View>
-            </View>
-        </View>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 };
 

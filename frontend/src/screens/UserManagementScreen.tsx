@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { getUsers, createUser, deleteUser } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 import { useTheme } from '../services/ThemeContext';
@@ -108,7 +108,11 @@ const UserManagementScreen = () => {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.text }]}>Técnicos</Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Gestión de personal de servicio</Text>
@@ -166,7 +170,8 @@ const UserManagementScreen = () => {
                     ItemSeparatorComponent={() => <View style={[styles.listSeparator, { backgroundColor: colors.background }]} />}
                 />
             </View>
-        </View>
+            </View>
+        </KeyboardAvoidingView>
     );
 };
 

@@ -10,6 +10,7 @@ export interface Evidence {
     id: number;
     rutaImagen: string;
     fechaCaptura: string;
+    estado?: ServiceStatus;
 }
 
 export interface ServiceOrder {
